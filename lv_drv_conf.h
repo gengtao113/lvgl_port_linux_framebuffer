@@ -447,16 +447,16 @@
 #endif
 
 #if USE_EVDEV || USE_BSD_EVDEV
-#  define EVDEV_NAME   "/dev/input/event10"        /*You can use the "evtest" Linux tool to get the list of devices and test them*/
+#  define EVDEV_NAME   "/dev/input/event1"        /* 本板：goodix-ts（电容）；event0=电源键。用 cat /proc/bus/input/devices 核对 */
 #  define EVDEV_SWAP_AXES         0               /*Swap the x and y axes of the touchscreen*/
 
-#  define EVDEV_CALIBRATE         0               /*Scale and offset the touchscreen coordinates by using maximum and minimum values for each axis*/
+#  define EVDEV_CALIBRATE         0               /* 电容屏坐标已近像素域，勿用电阻 TSC 的 0~4095 映射；偏移时再开并改 MIN/MAX */
 
 #  if EVDEV_CALIBRATE
 #    define EVDEV_HOR_MIN         0               /*to invert axis swap EVDEV_XXX_MIN by EVDEV_XXX_MAX*/
-#    define EVDEV_HOR_MAX      4096               /*"evtest" Linux tool can help to get the correct calibraion values>*/
+#    define EVDEV_HOR_MAX      4095               /*仅电阻 TSC / 需线性映射时使用*/
 #    define EVDEV_VER_MIN         0
-#    define EVDEV_VER_MAX      4096
+#    define EVDEV_VER_MAX      4095
 #  endif  /*EVDEV_CALIBRATE*/
 #endif  /*USE_EVDEV*/
 

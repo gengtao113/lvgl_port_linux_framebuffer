@@ -1,3 +1,7 @@
+# Build output (objects + demo)
+/lvgl_build_output/
+/demo
+
 # Prerequisites
 *.d
 
