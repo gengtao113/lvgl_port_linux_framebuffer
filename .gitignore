@@ -1,5 +1,7 @@
-# Build output (objects + demo)
+# Build output (CMake out-of-tree + demo)
 /lvgl_build_output/
+/build/
+/cmake-build-*/
 /demo
 
 # Prerequisites

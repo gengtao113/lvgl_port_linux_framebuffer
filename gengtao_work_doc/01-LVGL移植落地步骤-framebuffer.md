@@ -4,7 +4,9 @@
 > 板卡：正点原子 ATK-MX6ULL（CORE + ALPHA）  
 > 屏：本工程实测 **/dev/fb0 = 1024×600，16bpp**  
 > 触摸：**/dev/input/event1**（`goodix-ts` 电容；文档 **21** L4）；`event0` 为电源键，勿用  
-> 工程：`~/linux-imx6ull/gengtao_linux_frambuffer_lvgl/lv_port_linux_frame_buffer`  
+> 工程：`~/linux-imx6ull/gengtao_linux_frambuffer_lvgl/lvgl_port_linux_framebuffer`  
+> 构建：CMake（见同目录 **02-构建体系-Makefile到CMake.md**）  
+
 > 工具链：`/usr/local/arm/gcc-linaro-4.9.4-2017.01-x86_64_arm-linux-gnueabihf/bin`  
 > 关联 BSP：内核 LCD/fb 见 overlay 文档 **09**；电容触摸见 **21**/**22**/**23**
 
@@ -73,12 +75,12 @@ cat /proc/bus/input/devices
 ## L1 确认工程与 submodule
 
 ```bash
-cd ~/linux-imx6ull/gengtao_linux_frambuffer_lvgl/lv_port_linux_frame_buffer
+cd ~/linux-imx6ull/gengtao_linux_frambuffer_lvgl/lvgl_port_linux_framebuffer
 
 # 若 lvgl / lv_drivers 目录不完整
 git submodule update --init --recursive
 
-ls lvgl/lvgl.h lv_drivers/display/fbdev.c main.c Makefile lv_conf.h lv_drv_conf.h
+ls lvgl/lvgl.h lv_drivers/display/fbdev.c main.c CMakeLists.txt lv_conf.h lv_drv_conf.h
 ```
 
 | 文件 | 作用 |
@@ -86,7 +88,7 @@ ls lvgl/lvgl.h lv_drivers/display/fbdev.c main.c Makefile lv_conf.h lv_drv_conf.
 | `main.c` | 注册 disp/indev，调 `lv_demo_widgets` |
 | `lv_conf.h` | LVGL 内核配置（色深、demo 开关、内存） |
 | `lv_drv_conf.h` | fbdev / evdev 路径 |
-| `Makefile` | 编出 `lvgl_build_output/demo`（`.o` 同目录） |
+| `CMakeLists.txt` | 编出 `lvgl_build_output/demo`（out-of-tree） |
 
 默认已开：`USE_FBDEV=1`、`USE_EVDEV=1`、`LV_USE_DEMO_WIDGETS=1`。
 
@@ -134,7 +136,7 @@ disp_drv.ver_res    = 600;
 #define EVDEV_CALIBRATE   0   /* 电容坐标已近像素；勿用电阻 TSC 的 0~4095 映射 */
 ```
 
-> **本板已改（2026-09-04）：** `EVDEV_NAME=event1`，`EVDEV_CALIBRATE=0`；已 `./build_lvgl && ./copy_lvgl_build_file.sh` → NFS `/root/demo`。
+> **本板已改（2026-09-04）：** `EVDEV_NAME=event1`，`EVDEV_CALIBRATE=0`；已 `./build_lvgl.sh && ./copy_lvgl_build_file.sh` → NFS `/root/demo`。
 
 若光标整体偏移，再按附录 B 临时开校准并改 MIN/MAX（不要照搬电阻 4095）。
 
@@ -155,37 +157,37 @@ disp_drv.ver_res    = 600;
 
 ### 方式 A：脚本（推荐）
 
-脚本在工程目录：`lv_port_linux_frame_buffer/build_lvgl`（传入 `CC=` / `BUILD_DIR=`，并用 **GCC 4.9 兼容 CFLAGS** 覆盖官方偏新的 `-W*`）。**产物统一在 `lvgl_build_output/`**（`.o` + `demo`）。
+脚本在工程目录：`build_lvgl.sh`（内部 `cmake` 配置 + 构建，**GCC 4.9 兼容选项**见 `CMakeLists.txt`）。**产物统一在 `lvgl_build_output/demo`**。构建细节见 **02**。
 
 ```bash
-cd ~/linux-imx6ull/gengtao_linux_frambuffer_lvgl/lv_port_linux_frame_buffer
-chmod +x build_lvgl
-./build_lvgl
+cd ~/linux-imx6ull/gengtao_linux_frambuffer_lvgl/lvgl_port_linux_framebuffer
+chmod +x build_lvgl.sh
+./build_lvgl.sh
 ```
 
 可选：
 
 ```bash
-./build_lvgl clean                          # 只 clean
-JOBS=4 ./build_lvgl                         # 指定并行数
-TOOLCHAIN_BIN=/你的工具链/bin ./build_lvgl  # 工具链不在默认路径时
+./build_lvgl.sh clean                          # 删除构建目录
+JOBS=4 ./build_lvgl.sh                         # 指定并行数
+TOOLCHAIN_BIN=/你的工具链/bin ./build_lvgl.sh  # 工具链不在默认路径时
 ```
 
-脚本会：`make clean` → `make CC=… CFLAGS=… BUILD_DIR=lvgl_build_output -j…` → `file lvgl_build_output/demo` 检查是否为 **ARM**。
+脚本会：`cmake -S . -B lvgl_build_output …` → `cmake --build …` → `file lvgl_build_output/demo` 检查是否为 **ARM**。
 
 ### 方式 B：手动命令
 
 ```bash
-cd ~/linux-imx6ull/gengtao_linux_frambuffer_lvgl/lv_port_linux_frame_buffer
+cd ~/linux-imx6ull/gengtao_linux_frambuffer_lvgl/lvgl_port_linux_framebuffer
 
 export PATH=/usr/local/arm/gcc-linaro-4.9.4-2017.01-x86_64_arm-linux-gnueabihf/bin:$PATH
 which arm-linux-gnueabihf-gcc   # 应能找到
 
-# 注意：必须带兼容 CFLAGS，否则 Linaro 4.9 会报 -Wshift-negative-value
-CFLAGS_ARM='-std=gnu99 -O3 -g0 -I'"$(pwd)"'/ -Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initializers -Wno-unused-function -fno-strict-aliasing'
-
-make clean
-make CC=arm-linux-gnueabihf-gcc CFLAGS="$CFLAGS_ARM" BUILD_DIR=lvgl_build_output -j$(nproc)
+cmake -S . -B lvgl_build_output \
+  -DCMAKE_SYSTEM_NAME=Linux \
+  -DCMAKE_C_COMPILER=arm-linux-gnueabihf-gcc \
+  -DCMAKE_BUILD_TYPE=Release
+cmake --build lvgl_build_output -j$(nproc)
 
 file lvgl_build_output/demo
 # 期望：ELF 32-bit LSB executable, ARM, ...
@@ -194,9 +196,10 @@ ls -lh lvgl_build_output/demo
 
 | 现象 | 处理 |
 |------|------|
+| `cmake: not found` | 安装 CMake ≥ 3.12 |
 | `arm-linux-gnueabihf-gcc: not found` | 检查 PATH / `TOOLCHAIN_BIN` |
 | 缺头文件 / submodule | 重做 L1 `git submodule update --init --recursive` |
-| 编出 x86 的 `demo` | 未用交叉 `CC=`；用脚本可自动检查 |
+| 编出 x86 的 `demo` | 未指定交叉 `CMAKE_C_COMPILER`；用脚本可自动检查 |
 
 **通过判据：** `file lvgl_build_output/demo` 显示 **ARM**，非 x86-64。
 
@@ -276,7 +279,7 @@ cd /root   # 或 demo 所在目录
 2. **不要**再填电阻 TSC 的 0～4095（那是 ADC 量程）  
 3. 轴反了再试 `EVDEV_SWAP_AXES 1`  
 
-改完后重新 `./build_lvgl && ./copy_lvgl_build_file.sh` 上板验证。
+改完后重新 `./build_lvgl.sh && ./copy_lvgl_build_file.sh` 上板验证。
 
 正式电容方案见：`linux-kernel-overlay/gengtao-bsp-doc/21-电容触摸打通-分析思路与落地顺序.md`。
 

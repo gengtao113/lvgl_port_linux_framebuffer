@@ -16,7 +16,7 @@ DEST="${DEST_DIR}/${DEST_NAME}"
 
 if [[ ! -f "${SRC}" ]]; then
 	echo "ERROR: 找不到产物：${SRC}"
-	echo "  请先执行：./build_lvgl"
+	echo "  请先执行：./build_lvgl.sh"
 	exit 1
 fi
 
