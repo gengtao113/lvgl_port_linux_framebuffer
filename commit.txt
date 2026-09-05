@@ -1,0 +1,53 @@
+# LVGL 播放 GIF + 双缓冲/Pan Display 消撕裂（ATK-MX6ULL）
+
+> 仓库：`lvgl_port_linux_framebuffer`
+> 日期：2026-09-05
+> 目标：板上用 LVGL 播放 GIF，并用「双缓冲 + FBIOPAN_DISPLAY」消除撕裂
+
+## 业务目标
+
+- **播放 GIF 动图**：`lv_conf.h` 开 GIF 解码 + 文件系统接口，`main.c` 用 `lv_gif_create` 播放 `/root/*.gif`
+- **消除撕裂**：显存申请两页（`yres_virtual = 2×yres`），一页给 LCD 扫、一页给 CPU 画，整帧画完后 `FBIOPAN_DISPLAY` 翻页
+- **可观测**：左上角叠字显示 FPS、模式（`dblbuf+pan` / `single`）、最近脏区尺寸、每帧 flush 次数
+
+## 做了什么
+
+1. **GIF 播放链路打通**
+   - `lv_conf.h`：`LV_USE_GIF=1`、`LV_USE_FS_STDIO=1`（盘符 `'A'`，`"A:/root/x.gif"` → `fopen("/root/x.gif")`）、`LV_MEM_CUSTOM=1`（512×512 GIF 解码约需 1MiB，改用系统堆）
+   - `main.c`：`lv_gif_create` + `lv_gif_set_src` 播放 `A:/root/susan-lu4esm-wallpaper-1492_512.gif`
+
+2. **双缓冲 + Pan Display**
+   - `fbdev.c`：init 时 `FBIOPUT_VSCREENINFO` 设 `yres_virtual = 2×yres`，`mmap` 两页；flush 只写「后台页」；本帧最后一块 flush 发 `FBIOPAN_DISPLAY` 翻页
+   - `main.c`：两块整屏 draw buffer + `full_refresh=1`，保证翻页前后台页是完整一帧
+
+3. **性能统计与叠字**
+   - `fbdev.c`：统计 FPS（1s 滑动窗口）、最近脏区宽高、每帧 flush 次数、是否整屏
+   - `fbdev.h`：新增 `fbdev_perf_t` / `fbdev_get_perf()` / `fbdev_dblbuf_enabled()`
+   - `main.c`：`lv_timer` 每 500ms 刷新叠字 label
+
+4. **拷贝脚本支持素材**
+   - `copy_lvgl_build_file.sh`：顺带把工程 `GIF/*.gif` 拷到 NFS `/root/`，与 `main.c` 的 `GIF_PATH` 对齐；`COPY_GIF=0` 可只拷 demo
+
+5. **文档**
+   - 新增 `gengtao_work_doc/03-LVGL播放GIF动图-落地步骤.md`、`gengtao_work_doc/04-双缓冲与Pan-Display机制-用户态到mxsfb.md`
+
+## 涉及文件
+
+| 文件 | 作用 |
+|------|------|
+| `lv_conf.h` | 开 GIF / FS_STDIO / MEM_CUSTOM |
+| `lv_drivers/display/fbdev.c` | 双页申请、后台写、FBIOPAN_DISPLAY、perf 统计 |
+| `lv_drivers/display/fbdev.h` | `fbdev_perf_t` + `fbdev_get_perf` + `fbdev_dblbuf_enabled` |
+| `main.c` | 整屏双 draw buffer、full_refresh、GIF 播放、叠字 |
+| `copy_lvgl_build_file.sh` | 拷贝 GIF 素材到 NFS |
+| `GIF/` | GIF 素材 |
+| `gengtao_work_doc/03`、`04` | 落地与机制说明 |
+
+## 怎么验收
+
+```text
+./build_lvgl.sh && ./copy_lvgl_build_file.sh
+# 板上 /root/demo：GIF 播放、左上角叠字显示 FPS/mode、比单缓冲更少撕裂
+```
+
+> 注意：双缓冲 + pan 主要**消除撕裂**，不提高帧率；当前约 6fps 时瓶颈在整屏软渲 + 整屏 memcpy + GIF 软解（见文档 04）。

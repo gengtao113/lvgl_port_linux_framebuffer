@@ -44,6 +44,22 @@ void fbdev_init(void);
 void fbdev_exit(void);
 void fbdev_flush(lv_disp_drv_t * drv, const lv_area_t * area, lv_color_t * color_p);
 void fbdev_get_sizes(uint32_t *width, uint32_t *height);
+
+/** 刷屏统计：供 UI 显示 FPS / 局部或整屏 */
+typedef struct {
+    uint32_t fps;              /* 近 1s 内完整刷新周期次数 */
+    uint32_t flush_last_w;     /* 最近一次 flush 脏区宽 */
+    uint32_t flush_last_h;     /* 最近一次 flush 脏区高 */
+    uint32_t flush_per_frame;  /* 上一完整周期内 flush 次数（>1 多为局部分块） */
+    uint8_t  last_was_full;    /* 上一完整周期是否曾出现整屏脏区 */
+    uint8_t  mode_partial;     /* 1=局部刷屏机制；0=驱动配置为整屏 */
+} fbdev_perf_t;
+
+void fbdev_get_perf(fbdev_perf_t * out);
+
+/** 1：已成功启用 yres_virtual×2 + FBIOPAN_DISPLAY */
+int fbdev_dblbuf_enabled(void);
+
 /**
  * Set the X and Y offset in the variable framebuffer info.
  * @param xoffset horizontal offset
