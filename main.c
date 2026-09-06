@@ -15,6 +15,10 @@
 /* 板上路径；宿主机素材在工程 GIF/ 目录，需 cp 到 NFS /root/（见文档 03 G2） */
 #define GIF_PATH "A:/root/susan-lu4esm-wallpaper-1492_512.gif"
 
+/* OPPO Sans 中文字库（fonts/oppo_sans_20.c / oppo_sans_14.c，见文档 08 步 4） */
+LV_FONT_DECLARE(oppo_sans_20);
+LV_FONT_DECLARE(oppo_sans_14);
+
 static lv_obj_t * s_perf_label;
 
 static void perf_timer_cb(lv_timer_t * t)
@@ -25,7 +29,7 @@ static void perf_timer_cb(lv_timer_t * t)
 
     char buf[128];
     snprintf(buf, sizeof(buf),
-             "FPS:%lu  mode:%s  last:%lux%lu  flushes/f:%lu",
+             "FPS帧率:%lu  mode模式:%s  last:%lux%lu  flushes/f:%lu",
              (unsigned long)p.fps,
              fbdev_dblbuf_enabled() ? "dblbuf+pan" : "single",
              (unsigned long)p.flush_last_w,
@@ -72,13 +76,21 @@ int main(void)
     lv_gif_set_src(gif, GIF_PATH);
     lv_obj_center(gif);
 
+    /* 中文示例：底部中间显示「你好，OPPO Sans 中文字体」（验证字库可用） */
+    lv_obj_t * cn_label = lv_label_create(lv_scr_act());
+    lv_obj_set_style_text_font(cn_label, &oppo_sans_20, 0);
+    lv_obj_set_style_text_color(cn_label, lv_color_hex(0xFFFFFF), 0);
+    lv_label_set_text(cn_label, "你好，OPPO Sans 中文字体，今天是2026-09-06");
+    lv_obj_align(cn_label, LV_ALIGN_BOTTOM_MID, 0, -8);
+
     s_perf_label = lv_label_create(lv_layer_top());
+    lv_obj_set_style_text_font(s_perf_label, &oppo_sans_14, 0);   /* 小号中文，FPS 里的「帧率/模式」才能显示 */
     lv_obj_set_style_text_color(s_perf_label, lv_color_hex(0x00FF88), 0);
     lv_obj_set_style_bg_color(s_perf_label, lv_color_hex(0x000000), 0);
     lv_obj_set_style_bg_opa(s_perf_label, LV_OPA_70, 0);
     lv_obj_set_style_pad_all(s_perf_label, 6, 0);
     lv_label_set_text(s_perf_label,
-                      fbdev_dblbuf_enabled() ? "FPS:--  mode:dblbuf+pan" : "FPS:--  mode:single");
+                      fbdev_dblbuf_enabled() ? "FPS帧率:--  mode:dblbuf+pan" : "FPS:--  mode:single");
     lv_obj_align(s_perf_label, LV_ALIGN_TOP_LEFT, 8, 8);
     lv_timer_create(perf_timer_cb, 500, NULL);
 

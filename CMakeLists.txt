@@ -46,6 +46,8 @@ find_package(Threads REQUIRED)
 add_executable(demo
     main.c
     mouse_cursor_icon.c
+    fonts/oppo_sans_20.c
+    fonts/oppo_sans_14.c
 )
 
 target_include_directories(demo PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
